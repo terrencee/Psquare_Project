@@ -43,7 +43,7 @@ function App() {
 
           <h4>Select File Type:</h4>
           <div style={{ display: "flex", justifyContent: "center", gap: "10px", flexWrap: "wrap" }}>
-            {["jpg", "png", "pdf", "docx", "txt"].map((type) => (
+            {["jpg", "png", "pdf", "docx", "txt", "webp"].map((type) => (
               <button
                 key={type}
                 onClick={() => handleTypeSelection(type)}
