@@ -13,6 +13,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+logger.info("FastAPI server started!")
+
 
 #enable cors
 app.add_middleware( 
@@ -45,7 +47,7 @@ async def upload_files(
     returns a filled form PDF URL"""
     
     # to debug : print recieved received request data
-    form_data = await request.form
+    form_data = await request.form()
     logger.info(f"Received form data: {form_data}")
 
 
