@@ -28,6 +28,10 @@ app.add_middleware(
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Create folder if it does not exist 
 
+OUTPUT_FOLDER = "output" # folder to store the generated PDFs
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+
 @app.post("/upload")
 async def upload_files(
                       request: Request, # to inspect the request
@@ -42,12 +46,12 @@ async def upload_files(
     
     # to debug : print recieved received request data
     form_data = await request.form
-    print("Received form data: ", form_data) # gives logs of all form fields
+    logger.info(f"Received form data: {form_data}")
+
 
     # printing individual files received
-    print(" Received form file: ", form_file.filename)
-    print("received receipt files: ", 
-          [file.filename for file in receipt_files])
+    logger.info(f"Received form file: {form_file.filename}")
+    logger.info(f"Received receipt files: {[file.filename for file in receipt_files]}")
 
     # save the form file
     form_path = os.path.join(UPLOAD_FOLDER,form_file.filename)
@@ -65,7 +69,10 @@ async def upload_files(
     
     # call file processing method
     pdf_url = process_reimbursement_form(form_path, receipt_paths, model_name)
-    print(pdf_url)
+
+    if not pdf_url:
+        return {"error": "Failed to generate PDF"}
+    
     logger.info(f"Generated PDF URL: {pdf_url}")
 
     return {"message": "Files processed successfully", 
