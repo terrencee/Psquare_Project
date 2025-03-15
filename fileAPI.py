@@ -71,12 +71,14 @@ async def upload_files(
     return {"message": "Files processed successfully", 
             "pdf_url": pdf_url}
 
-    @app.get("/download/{filename}")
-    async def download_file(filename: str):
+@app.get("/download/{filename}")
+async def download_file(filename: str):
         file_path = os.path.join(OUTPUT_FOLDER, filename)
         if os.path.exists(file_path):
             return FileResponse(file_path, media_type="application/pdf", filename=filename)
         return {"error": "File not found"}
+
+    
 
    
 
