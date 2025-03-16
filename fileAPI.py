@@ -9,11 +9,15 @@ import logging
 # importing my method that will process the forms.
 from file_processor import process_reimbursement_form
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-logger.info("FastAPI server started!")
+logger.info("01 FastAPI server started!")
+
+print("Current Working Directory:", os.getcwd())
+print("Files in Directory:", os.listdir(os.getcwd()))
 
 
 #enable cors
@@ -39,7 +43,7 @@ async def upload_files(
                       request: Request, # to inspect the request
                       form_file: UploadFile = File(...),
                       receipt_files: List[UploadFile] = File(...), # accept multiple files
-                      model_name: str = Form("mistral") # we may allow frontend to select model                     
+                      model_name: str = Form("llama3.2:latest") # we may allow frontend to select model                     
                       ):
 
     """ Recieves form + multiple receipts, 
@@ -71,6 +75,7 @@ async def upload_files(
     
     # call file processing method
     pdf_url = process_reimbursement_form(form_path, receipt_paths, model_name)
+    logger.info(f"Received pdf url: {pdf_url}")
 
     if not pdf_url:
         return {"error": "Failed to generate PDF"}
