@@ -1,98 +1,72 @@
-from fastapi import FastAPI, File, UploadFile, Form, Depends, Request
+from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.responses import FileResponse
+import io
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-#handling multiple files
-from typing import List
-import shutil
 import os
+import shutil
 import logging
-# importing my method that will process the forms.
+from typing import List
 from file_processor import process_reimbursement_form
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-logger.info("01 FastAPI server started!")
 
-print("Current Working Directory:", os.getcwd())
-print("Files in Directory:", os.listdir(os.getcwd()))
-
-
-#enable cors
-app.add_middleware( 
+# Enable CORS
+app.add_middleware(
     CORSMiddleware,
-
-    allow_origins=["*"],# for production = *. for local we could keep it as "http://localhost:3000"
-    #allow requests from react frontend
-        allow_credentials = True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Create folder if it does not exist 
-
-OUTPUT_FOLDER = "output" # folder to store the generated PDFs
+OUTPUT_FOLDER = "output"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-
 
 @app.post("/upload")
 async def upload_files(
-                      request: Request, # to inspect the request
-                      form_file: UploadFile = File(...),
-                      receipt_files: List[UploadFile] = File(...), # accept multiple files
-                      model_name: str = Form("llama3.2:latest") # we may allow frontend to select model                     
-                      ):
-
-    """ Recieves form + multiple receipts, 
-    processes them with AI and 
-    returns a filled form PDF URL"""
+    request: Request,
+    form_file: UploadFile = File(...),
+    receipt_files: List[UploadFile] = File(...),
+    model_name: str = Form("llama3.2:latest")
+):
+    """Receives form + receipts, processes them with AI, and returns a filled PDF."""
     
-    # to debug : print recieved received request data
-    form_data = await request.form()
-    logger.info(f"Received form data: {form_data}")
-
-
-    # printing individual files received
-    logger.info(f"Received form file: {form_file.filename}")
-    logger.info(f"Received receipt files: {[file.filename for file in receipt_files]}")
-
-    # save the form file
-    form_path = os.path.join(UPLOAD_FOLDER,form_file.filename)
+    form_path = os.path.join(UPLOAD_FOLDER, form_file.filename)
     with open(form_path, "wb") as buffer:
         shutil.copyfileobj(form_file.file, buffer)
 
-
-    # save multiple receipts
     receipt_paths = []
     for receipt_file in receipt_files:
-        receipt_path =  os.path.join(UPLOAD_FOLDER,receipt_file.filename)
+        receipt_path = os.path.join(UPLOAD_FOLDER, receipt_file.filename)
         with open(receipt_path, "wb") as buffer:
             shutil.copyfileobj(receipt_file.file, buffer)
-            receipt_paths.append(receipt_path)
-    
-    # call file processing method
-    pdf_url = process_reimbursement_form(form_path, receipt_paths, model_name)
-    logger.info(f"Received pdf url: {pdf_url}")
+        receipt_paths.append(receipt_path)
 
-    if not pdf_url:
+    # Process reimbursement form
+    pdf_path = process_reimbursement_form(form_path, receipt_paths, model_name)
+
+    if not pdf_path:
         return {"error": "Failed to generate PDF"}
-    
-    logger.info(f"Generated PDF URL: {pdf_url}")
 
-    return {"message": "Files processed successfully", 
-            "pdf_url": pdf_url}
+    return {"message": "Files processed successfully", "pdf_url": f"/download/{os.path.basename(pdf_path)}"}
 
-@app.get("/download/{filename}")
-async def download_file(filename: str):
-        file_path = os.path.join(OUTPUT_FOLDER, filename)
-        if os.path.exists(file_path):
-            return FileResponse(file_path, media_type="application/pdf", filename=filename)
-        return {"error": "File not found"}
-
-    
-
-   
-
+@app.get("/download")
+async def download_file():
+    OP_FOLDER = r"D:\Making LLMs fill Reimbursement form\output"
+    logger.info(f"Files in output folder: {os.listdir(OP_FOLDER)}")
+    #logger.info(f"Downloading file: {filename}")
+    file_path = os.path.join(OP_FOLDER, "Filled_Reimbursement_Form.docx")
+    logger.info(f"Downloading file: {file_path}")
+    if os.path.exists(file_path):
+        return FileResponse(file_path, 
+                            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+                            filename="Filled_Reimbursement_Form.docx")
+    # mediatype for word = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    # for pdf = "application/pdf"
+    return {"error": "File not found"}

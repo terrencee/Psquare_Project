@@ -48,11 +48,14 @@ function App() {
       return;
     }
 
+    
+
     // Creating a FormData object
     const formData = new FormData();
     formData.append("form_file", formFile);
     receiptFiles.forEach((file) => formData.append("receipt_files", file));
     formData.append("model_name", selectedModel);
+    console.log("Form Data:", formData.get.receiptFiles, formData.get.formFile); // Log FormData object
 
     try {
       // Sending a POST request to FastAPI backend
@@ -75,10 +78,42 @@ function App() {
     }
   };
 
-  // Log `pdfUrl` whenever it updates
+  // Log pdfUrl whenever it updates
   useEffect(() => {
     console.log("Updated PDF URL:", pdfUrl);
   }, [pdfUrl]);
+
+  // download function
+
+  const handleDownload = async () => {
+    try {
+        // Make a GET request to the download endpoint with the full file path as a parameter
+        const response = await fetch(`http://localhost:8000/download`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to download file');
+        }
+        
+        // Create a blob from the response
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        
+        // Create a temporary link and trigger download
+        window.open(url, '_blank');
+        //window.open(`https://www.sejda.com/pdf-editor?url=${encodeURIComponent(url)}`, '_blank');
+
+        /*const link = document.createElement('a');
+        link.href = url;
+        //link.setAttribute('download', filePath.split('\\').pop()); // Handling Windows file paths
+        console.log("link", link);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);*/
+    } catch (error) {
+        console.error('Error downloading file:', error);
+    }
+};
+
 
   return (
     <div style={{ textAlign: "center", marginTop: "50px" }}>
@@ -128,42 +163,42 @@ function App() {
           borderRadius: "5px",
         }}
       >
-        Upload Files
+        Process Form
       </button>
 
       {/* Show Upload Status Message */}
       {message && <p style={{ color: "red", marginTop: "10px" }}>{message}</p>}
 
-      {/* Download Button (always visible, but disabled until pdfUrl exists) */}
+      {/* Download Button (always visible, but disabled until pdf is ready) */}
       <div style={{ marginTop: "20px" }}>
         <p><strong>Download Filled Form:</strong></p>
-        <button
-          disabled={!pdfUrl}  // Disable if pdfUrl is empty
-          style={{
-            padding: "10px",
-            backgroundColor: pdfUrl ? "green" : "gray",  // Change color when enabled
-            color: "white",
-            cursor: pdfUrl ? "pointer" : "not-allowed",  // Change cursor
-            border: "none",
-            borderRadius: "5px",
-          }}
-          onClick={() => {
-            if (pdfUrl) window.open(pdfUrl, "_blank");
-          }}
-        >
-          Download Form
-        </button>
+
+<button
+  disabled={!pdfUrl}
+  onClick={() => pdfUrl && handleDownload(pdfUrl)}
+  style={{
+    padding: "10px",
+    backgroundColor: pdfUrl ? "green" : "gray",
+    color: "white",
+    cursor: pdfUrl ? "pointer" : "not-allowed",
+    border: "none",
+    borderRadius: "5px",
+  }}
+>
+  Download Form
+</button>
 
         {/* Show PDF URL if available */}
         {pdfUrl && (
           <p style={{ marginTop: "10px", wordBreak: "break-word" }}>
             <strong>Generated PDF URL:</strong>{" "}
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
-              {pdfUrl}
+            <a href={`http://localhost:8000${pdfUrl}`} target="_blank" rel="noopener noreferrer">{`http://localhost:8080${pdfUrl}`}
             </a>
           </p>
         )}
       </div>
+      {/* Show Success or Failure Messages */}
+      {message && <p style={{ marginTop: "10px", fontWeight: "bold" }}>{message}</p>}
     </div>
   );
 }
