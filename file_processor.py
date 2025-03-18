@@ -120,7 +120,7 @@ def update_filled_form_initial(form_text, bill_text, model_name):
     - For numerical fields requiring summation across multiple entries, missing values should be treated as **0**.  
     - Maintain the exact structure and format in your output.  
 
-    Return the extracted data **exactly** in the format of the form provided.
+    Return the extracted data **exactly** in the format of the form in {form_text} provided.
     """
     try:
         response = chat(
