@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+//import { LatexEditor } from "@evyu/latex-editor";
 
 function App() {
   // State for storing form and receipts
@@ -88,7 +89,8 @@ function App() {
   const handleDownload = async () => {
     try {
         // Make a GET request to the download endpoint with the full file path as a parameter
-        const response = await fetch(`http://localhost:8000/download`);
+        const response = await fetch(`http://localhost:8000/show-latex`);
+        console.log("response", response);
         
         if (!response.ok) {
             throw new Error('Failed to download file');
@@ -99,8 +101,10 @@ function App() {
         const url = window.URL.createObjectURL(blob);
         
         // Create a temporary link and trigger download
+        
         window.open(url, '_blank');
         //window.open(`https://www.sejda.com/pdf-editor?url=${encodeURIComponent(url)}`, '_blank');
+      
 
         /*const link = document.createElement('a');
         link.href = url;
@@ -113,6 +117,37 @@ function App() {
         console.error('Error downloading file:', error);
     }
 };
+
+// latex component
+
+{/*
+const LatexEditorComponent = () => {
+  const [latexContent, setLatexContent] = useState("");
+
+  useEffect(() => {
+      // Fetch the LaTeX content from the backend
+      fetch("http://localhost:8000/get-latex")
+          .then((res) => res.json())
+          .then((data) => setLatexContent(data.content))  
+          .catch((err) => console.error("Error fetching LaTeX file:", err));
+  }, []);
+
+  const handleSaveAndConvert = async () => {
+      // Send edited LaTeX content to backend for saving and PDF conversion
+      const response = await fetch("http://localhost:8000/save-latex", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ latex_content: latexContent }),
+      });
+      
+      const data = await response.json();
+      if (data.pdf_url) {
+          window.open(`http://localhost:8000${data.pdf_url}`, "_blank");
+      } else {
+          alert("Error converting to PDF");
+      }
+  }
+}; */}
 
 
   return (
@@ -197,6 +232,12 @@ function App() {
           </p>
         )}
       </div>
+      {/*}
+      <div>
+            <h2>LaTeX Editor</h2>
+            <LatexEditor value={latexContent} onChange={setLatexContent} />
+            <button onClick={handleSaveAndConvert}>Download as PDF</button>
+        </div> */}
       {/* Show Success or Failure Messages */}
       {message && <p style={{ marginTop: "10px", fontWeight: "bold" }}>{message}</p>}
     </div>
