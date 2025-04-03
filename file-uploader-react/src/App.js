@@ -1,7 +1,23 @@
 import React, { useState, useEffect } from "react";
-//import { LatexEditor } from "@evyu/latex-editor";
+import html2pdf from "html2pdf.js";
+//import PreviewPage from "./PreviewPage"; // Import the PreviewPage component
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import PreviewPage from "./Preview"; // Make sure you have a Preview component
+import ReactDOM from "react-dom/client"; // Ensure correct import
+import { BrowserRouter } from "react-router-dom";
 
-function App() {
+const App = () => {
+
+  const [receipts, setReceipts] = useState([]);
+  const [formData, setFormData] = useState({}); // Holds the form data
+  const [textData, setTextData] = useState([]); // Holds extracted text from the form
+const [tables, setTables] = useState([]); // Holds extracted tables from the form
+const [lastHtmlData, setLastHtmlData] = useState(""); // Holds the latest HTML form
+const navigate = useNavigate();
+
+
+
   // State for storing form and receipts
   const [formFile, setFormFile] = useState(null);
   const [receiptFiles, setReceiptFiles] = useState([]);
@@ -12,8 +28,13 @@ function App() {
   // State for LLM model selection
   const [selectedModel, setSelectedModel] = useState("mistral");
 
+  // state for llm source
+  const [selectedLLMSource, setSelectedLLMSource] = useState("ollama");
+
   // State for storing the final generated PDF URL
   const [pdfUrl, setPdfUrl] = useState("");
+
+  const [extractedText, setExtractedText] = useState("");
 
   // Available models
   const models = [
@@ -32,6 +53,7 @@ function App() {
   // Handles Form File selection
   const handleFormFileChange = (event) => {
     setFormFile(event.target.files[0]);
+    console.log("Form File:", event.target.files[0]); // Log selected file
     setMessage(""); // Clear previous messages
   };
 
@@ -42,121 +64,282 @@ function App() {
     setMessage(""); // Clear previous messages
   };
 
-  // Handles file upload to the FastAPI backend
-  const handleUpload = async () => {
-    if (!formFile || receiptFiles.length === 0) {
-      setMessage("Please upload both the form and at least one receipt!");
-      return;
+
+  //let lastHtmlData = null;  // Temporary storage for the latest HTML form
+
+  
+
+  //handles preview of blank gui
+  const handlePreview = async (event) => {
+    //const formFile = event.target.files?.[0]; // Ensure file is selected
+    if (!formFile) {
+        console.error("No file selected");
+        return;
     }
 
-    
+    const formData = new FormData();
+    formData.append("file", formFile);
+
+    console.log("223", formData.get("file")); // Log FormData object
+    // Get selected model and LLM source
+    const model = selectedModel;  // Example: "llama3.2:latest"
+    const llmSource = selectedLLMSource;  // Example: "ollama" or "huggingface"
+
+    console.log("221", model, llmSource); // Log selected model and LLM source
+    console.log("222", formData); // Log FormData object
+
+    try {
+      const response = await fetch(`http://localhost:8000/process-file/?model=${model}&llm_source=${llmSource}`,
+            { method: "POST", 
+              body: formData }
+        );
+        console.log("Response:", response);  //  Log the response object
+
+        if (!response.ok) {
+          console.error("Error from API:", await response.text());
+          return;
+        }
+        
+        const responseData = await response.json();  //  Convert to JSON first
+        console.log("Response Data:", responseData.html_form);  //  Log the response json data
+
+        if (responseData.html_form) {
+          // Save extracted HTML in localStorage
+          localStorage.setItem("previewFormHtml", responseData.html_form);
+
+          // Open preview page in a new tab
+          window.open("/preview", "_blank");
+        } else {
+          alert("Error extracting HTML data");
+      }
+
+
+        // Navigate to the new preview page, passing the extracted HTML
+        //  navigate("/preview", { state: { formHtml: responseData.html_form } });
+   
+        
+      /*  if (responseData.html_form) {
+          setLastHtmlData(responseData.html_form);  //  Store extracted HTML in state
+      } else {
+          alert("Error extracting HTML data");
+      }
+        //lastHtmlData = htmlData;  //  Store the latest HTML form
+        //useEffect(() => {  console.log("Updated lastHtmlData:", lastHtmlData);}, [lastHtmlData]);
+
+
+      
+        if (lastHtmlData) {
+          const previewWindow = window.open("", "_blank");
+      
+          if (previewWindow) {
+            previewWindow.document.open();
+            previewWindow.document.write(`
+                <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>Preview</title>
+                        <style>
+                            input, textarea { border: 1px solid #000; padding: 5px; width: 100%; }
+                        </style>
+                    </head>
+                    <body>
+                        <div id="previewContent">${lastHtmlData}</div>
+                    </body>
+                </html>
+            `);
+            previewWindow.document.close();
+        } else {
+            alert("Popup blocked! Allow pop-ups for preview.");
+        }
+      } 
+      else {
+          alert("Error extracting text");
+      }
+    */
+      
+    } catch (error) {
+        console.error("Error:", error);
+    }
+};
+
+
+
+
+  // Handles file upload to the FastAPI backend
+  const handleUpload = async () => {
+   /* if (!lastHtmlData || receiptFiles.length === 0) {
+      console.error("lastHtmlData:", lastHtmlData, "receiptFiles length:", receiptFiles.length);
+      setMessage("Please upload both the form and at least one receipt!");
+      return;
+    } */
+      if (receiptFiles.length === 0) {
+        console.error( "receiptFiles length:", receiptFiles.length);
+        setMessage("Please upload at least one receipt!");
+        return;
+      }
+
+      // Get the last stored HTML form
+  const lastHtmlData = localStorage.getItem("previewFormHtml"); // Ensure it's stored in localStorage somewhere
+  if (!lastHtmlData) {
+    setMessage("No form data available!");
+    return;
+  }
+  console.log("Last HTML Data:", lastHtmlData); // Log the last HTML data
+
+    // Convert HTML string into a Blob and create a File object
+    //const htmlBlob = new Blob([lastHtmlData], { type: "text/html" });
+    //const htmlFile = new File([htmlBlob], "form.html", { type: "text/html" });
 
     // Creating a FormData object
+
     const formData = new FormData();
-    formData.append("form_file", formFile);
+    formData.append("html_form", lastHtmlData); // Send form as a string
     receiptFiles.forEach((file) => formData.append("receipt_files", file));
     formData.append("model_name", selectedModel);
-    console.log("Form Data:", formData.get.receiptFiles, formData.get.formFile); // Log FormData object
+    formData.append("llm_source", selectedLLMSource);
+    // log the form data
+    console.log("Form Data:", formData.get("html_form"), formData.get("receipt_files"), formData.get("llm_source"), formData.get("model_name")); 
+    
+    
 
     try {
       // Sending a POST request to FastAPI backend
-      const response = await fetch("http://localhost:8000/upload", {
+      const response = await fetch("http://localhost:8000/fill-form", {
         method: "POST",
         body: formData,
       });
+
+      if (!response.ok) {
+        throw new Error("Failed to process receipt");
+      }
 
       // Parsing the response
       const data = await response.json();
       console.log("Backend response:", data); // Log backend response
 
-      if (data.pdf_url) {
-        setPdfUrl(data.pdf_url); // Update state with final PDF URL
+      // Instead of storing extracted fields, store the filled form
+    const filledHtml = data.filled_html_form;
+    console.log("filled form :", filledHtml)
+
+    
+    //previewWindow.postMessage({ filledHtml }, window.origin);
+
+      // **Try updating the existing preview page**
+      let previewUpdated = false;
+      const previewWindow = window.open("", "previewWindow");
+      try {
+        if (previewWindow && !previewWindow.closed) {
+          console.log("Attempting to send filledHtml via postMessage...");
+          previewWindow.postMessage({ filledHtml }, "*");  //  Send to previewWindow
+          previewUpdated = true;
+      } else {
+          console.log("Preview window does not exist or is closed.");
+      }
+      } catch (err) {
+          console.warn("Failed to update preview using postMessage:", err);
       }
 
-      setMessage(data.message); // Show success message from backend
+      //  **If postMessage fails, open a new tab and retry**
+      if (!previewUpdated) {
+        console.log("Opening new preview window...");
+          const previewWindow = window.open("/preview", "_blank");
+          if (previewWindow) {
+              previewWindow.onload = () => {
+                console.log("Preview window loaded, sending filledHtml...");
+                previewWindow.postMessage({ filledHtml }, "*");  //  Allow cross-origin messages
+                  //previewWindow.postMessage({ filledHtml }, window.origin);
+              };
+              setTimeout(() => {
+                console.log("Retrying postMessage to preview window...");
+              previewWindow.postMessage({ filledHtml }, "*");  //  Ensure message is sent
+                //  previewWindow.postMessage({ filledHtml }, window.origin);
+              }, 1000); // Fallback in case onload doesn't trigger
+          } else {
+              console.error("Popup blocked! Cannot open preview.");
+              setMessage("Please allow pop-ups to see the filled form.");
+          }
+      }
+    
+
+   
     } catch (error) {
+      console.error("Upload failed:", error);
       setMessage("Upload failed! Please try again.");
     }
   };
 
-  // Log pdfUrl whenever it updates
-  useEffect(() => {
-    console.log("Updated PDF URL:", pdfUrl);
-  }, [pdfUrl]);
+  /////////////////////////////////////////////
 
-  // download function
+  const generateEditableGUI = async (formPath) => {
+    const response = await fetch("http://localhost:8000/generate-editable-gui", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ form_path: formPath }),
+    });
+
+    const data = await response.json();
+    setFormData(data);
+    setTables(data.tables);
+  };
 
   const handleDownload = async () => {
-    try {
-        // Make a GET request to the download endpoint with the full file path as a parameter
-        const response = await fetch(`http://localhost:8000/show-latex`);
-        console.log("response", response);
-        
-        if (!response.ok) {
-            throw new Error('Failed to download file');
-        }
-        
-        // Create a blob from the response
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        
-        // Create a temporary link and trigger download
-        
-        window.open(url, '_blank');
-        //window.open(`https://www.sejda.com/pdf-editor?url=${encodeURIComponent(url)}`, '_blank');
-      
+    const response = await fetch("http://localhost:8000/save-latex", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
 
-        /*const link = document.createElement('a');
-        link.href = url;
-        //link.setAttribute('download', filePath.split('\\').pop()); // Handling Windows file paths
-        console.log("link", link);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);*/
-    } catch (error) {
-        console.error('Error downloading file:', error);
+    const data = await response.json();
+    if (data.pdf_url) {
+      window.open(`http://localhost:8000${data.pdf_url}`, "_blank");
     }
-};
-
-// latex component
-
-{/*
-const LatexEditorComponent = () => {
-  const [latexContent, setLatexContent] = useState("");
-
-  useEffect(() => {
-      // Fetch the LaTeX content from the backend
-      fetch("http://localhost:8000/get-latex")
-          .then((res) => res.json())
-          .then((data) => setLatexContent(data.content))  
-          .catch((err) => console.error("Error fetching LaTeX file:", err));
-  }, []);
-
-  const handleSaveAndConvert = async () => {
-      // Send edited LaTeX content to backend for saving and PDF conversion
-      const response = await fetch("http://localhost:8000/save-latex", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ latex_content: latexContent }),
-      });
-      
-      const data = await response.json();
-      if (data.pdf_url) {
-          window.open(`http://localhost:8000${data.pdf_url}`, "_blank");
-      } else {
-          alert("Error converting to PDF");
-      }
-  }
-}; */}
-
+  };
 
   return (
+
+  
+    <Routes>
+      {/* Main page where uploads are made */}
+      <Route path="/" element={
+
     <div style={{ textAlign: "center", marginTop: "50px" }}>
       <h2>Form Processor</h2>
 
       {/* Form Upload */}
       <p>Upload Form:</p>
       <input type="file" onChange={handleFormFileChange} />
+
+      <p>Select Your Preferred Model:</p>
+      <select onChange={(e) => setSelectedModel(e.target.value)} value={selectedModel}>
+        {models.map((model, index) => (
+          <option key={index} value={model}>
+            {model}
+          </option>
+        ))}
+      </select>
+
+      <p>Select Your LLM Source for form preview:</p>
+      <select onChange={(e) => setSelectedLLMSource(e.target.value)} value={selectedLLMSource}>
+      <option value="ollama">Local : Ollama</option>
+      <option value="huggingFace">Hugging Face</option>
+      </select>
+
+      <button 
+        onClick={handlePreview}
+        style={{
+          marginTop: "15px",
+          padding: "10px",
+          backgroundColor: "orange",
+          color: "white",
+          cursor: "pointer",
+          border: "none",
+          borderRadius: "5px",
+          marginLeft: "10px"
+        }}
+      >
+        Preview Form
+      </button>
 
       {/* Multiple Receipts Upload */}
       <p>Upload The Assisting Receipts:</p>
@@ -172,6 +355,12 @@ const LatexEditorComponent = () => {
         ))}
       </select>
 
+      <p>Select Your LLM Source for Form Fillup:</p>
+      <select onChange={(e) => setSelectedLLMSource(e.target.value)} value={selectedLLMSource}>
+      <option value="ollama">Local : Ollama</option>
+      <option value="huggingFace">Hugging Face</option>
+      </select>
+
       {/* Display Selected Files */}
       {formFile && <p><strong>Form Selected:</strong> {formFile.name}</p>}
       {receiptFiles.length > 0 && (
@@ -184,64 +373,47 @@ const LatexEditorComponent = () => {
           </ul>
         </div>
       )}
+      <button 
+      onClick={handleUpload}
+      style={{
+        marginTop: "15px",
+        padding: "10px",
+        backgroundColor: "blue",
+        color: "white",
+        cursor: "pointer",
+        border: "none",
+        borderRadius: "5px",
+      }}
+        >
+            Upload and Generate Form
+        </button>
 
-      {/* Upload Button */}
-      <button
-        onClick={handleUpload}
-        style={{
-          marginTop: "15px",
-          padding: "10px",
-          backgroundColor: "blue",
-          color: "white",
-          cursor: "pointer",
-          border: "none",
-          borderRadius: "5px",
-        }}
-      >
-        Process Form
-      </button>
+      <table>
+        <tbody>
+          {tables.map((row, index) => (
+            <tr key={index}>
+              {row.map((cell, i) => (
+                <td key={i} contentEditable>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {/* Show Upload Status Message */}
       {message && <p style={{ color: "red", marginTop: "10px" }}>{message}</p>}
 
-      {/* Download Button (always visible, but disabled until pdf is ready) */}
-      <div style={{ marginTop: "20px" }}>
-        <p><strong>Download Filled Form:</strong></p>
-
-<button
-  disabled={!pdfUrl}
-  onClick={() => pdfUrl && handleDownload(pdfUrl)}
-  style={{
-    padding: "10px",
-    backgroundColor: pdfUrl ? "green" : "gray",
-    color: "white",
-    cursor: pdfUrl ? "pointer" : "not-allowed",
-    border: "none",
-    borderRadius: "5px",
-  }}
->
-  Download Form
-</button>
-
-        {/* Show PDF URL if available */}
-        {pdfUrl && (
-          <p style={{ marginTop: "10px", wordBreak: "break-word" }}>
-            <strong>Generated PDF URL:</strong>{" "}
-            <a href={`http://localhost:8000${pdfUrl}`} target="_blank" rel="noopener noreferrer">{`http://localhost:8080${pdfUrl}`}
-            </a>
-          </p>
-        )}
-      </div>
-      {/*}
-      <div>
-            <h2>LaTeX Editor</h2>
-            <LatexEditor value={latexContent} onChange={setLatexContent} />
-            <button onClick={handleSaveAndConvert}>Download as PDF</button>
-        </div> */}
-      {/* Show Success or Failure Messages */}
-      {message && <p style={{ marginTop: "10px", fontWeight: "bold" }}>{message}</p>}
     </div>
+      }  // End of Route path="/" element
+      /> {/* End of Route */}
+
+      {/* Preview Page Route */}
+      <Route path="/preview" element={<PreviewPage />}  // Pass the extracted fields to the preview page
+      />
+
+      </Routes>
+  
   );
-}
+};
 
 export default App;
