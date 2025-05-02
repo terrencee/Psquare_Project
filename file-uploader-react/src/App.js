@@ -67,7 +67,7 @@ const navigate = useNavigate();
 
   //let lastHtmlData = null;  // Temporary storage for the latest HTML form
 
-  
+  let previewWindow = null; 
 
   //handles preview of blank gui
   const handlePreview = async (event) => {
@@ -82,17 +82,21 @@ const navigate = useNavigate();
 
     console.log("223", formData.get("file")); // Log FormData object
     // Get selected model and LLM source
-    const model = selectedModel;  // Example: "llama3.2:latest"
-    const llmSource = selectedLLMSource;  // Example: "ollama" or "huggingface"
+    //const model = selectedModel;  // Example: "llama3.2:latest"
+    //const llmSource = selectedLLMSource;  // Example: "ollama" or "huggingface"
 
-    console.log("221", model, llmSource); // Log selected model and LLM source
-    console.log("222", formData); // Log FormData object
+    //console.log("221", model, llmSource); // Log selected model and LLM source
+    //console.log("222", formData); // Log FormData object
 
     try {
-      const response = await fetch(`http://localhost:8000/process-file/?model=${model}&llm_source=${llmSource}`,
+     /* const response = await fetch(`http://localhost:8000/process-file/?model=${model}&llm_source=${llmSource}`,
             { method: "POST", 
               body: formData }
-        );
+        );*/
+        const response = await fetch("http://localhost:8000/preview-form/",
+          { method: "POST", 
+            body: formData }
+      );
         console.log("Response:", response);  //  Log the response object
 
         if (!response.ok) {
@@ -106,57 +110,17 @@ const navigate = useNavigate();
         if (responseData.html_form) {
           // Save extracted HTML in localStorage
           localStorage.setItem("previewFormHtml", responseData.html_form);
+          console.log("Saved HTML to localStorage:", localStorage.getItem("previewFormHtml"));
 
           // Open preview page in a new tab
-          window.open("/preview", "_blank");
+          previewWindow = window.open("/preview", "_blank");
+          if (!previewWindow) {
+            alert("Popup blocked! Please allow popups for this site.");
+          }
+          //window.open("/preview", "_blank");
         } else {
           alert("Error extracting HTML data");
       }
-
-
-        // Navigate to the new preview page, passing the extracted HTML
-        //  navigate("/preview", { state: { formHtml: responseData.html_form } });
-   
-        
-      /*  if (responseData.html_form) {
-          setLastHtmlData(responseData.html_form);  //  Store extracted HTML in state
-      } else {
-          alert("Error extracting HTML data");
-      }
-        //lastHtmlData = htmlData;  //  Store the latest HTML form
-        //useEffect(() => {  console.log("Updated lastHtmlData:", lastHtmlData);}, [lastHtmlData]);
-
-
-      
-        if (lastHtmlData) {
-          const previewWindow = window.open("", "_blank");
-      
-          if (previewWindow) {
-            previewWindow.document.open();
-            previewWindow.document.write(`
-                <html>
-                    <head>
-                        <meta charset="UTF-8">
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <title>Preview</title>
-                        <style>
-                            input, textarea { border: 1px solid #000; padding: 5px; width: 100%; }
-                        </style>
-                    </head>
-                    <body>
-                        <div id="previewContent">${lastHtmlData}</div>
-                    </body>
-                </html>
-            `);
-            previewWindow.document.close();
-        } else {
-            alert("Popup blocked! Allow pop-ups for preview.");
-        }
-      } 
-      else {
-          alert("Error extracting text");
-      }
-    */
       
     } catch (error) {
         console.error("Error:", error);
@@ -221,48 +185,20 @@ const navigate = useNavigate();
       // Instead of storing extracted fields, store the filled form
     const filledHtml = data.filled_html_form;
     console.log("filled form :", filledHtml)
+    localStorage.setItem("previewFormHtml", filledHtml);
 
-    
-    //previewWindow.postMessage({ filledHtml }, window.origin);
-
-      // **Try updating the existing preview page**
-      let previewUpdated = false;
-      const previewWindow = window.open("", "previewWindow");
-      try {
-        if (previewWindow && !previewWindow.closed) {
-          console.log("Attempting to send filledHtml via postMessage...");
-          previewWindow.postMessage({ filledHtml }, "*");  //  Send to previewWindow
-          previewUpdated = true;
-      } else {
-          console.log("Preview window does not exist or is closed.");
-      }
-      } catch (err) {
-          console.warn("Failed to update preview using postMessage:", err);
-      }
-
-      //  **If postMessage fails, open a new tab and retry**
-      if (!previewUpdated) {
-        console.log("Opening new preview window...");
-          const previewWindow = window.open("/preview", "_blank");
-          if (previewWindow) {
-              previewWindow.onload = () => {
-                console.log("Preview window loaded, sending filledHtml...");
-                previewWindow.postMessage({ filledHtml }, "*");  //  Allow cross-origin messages
-                  //previewWindow.postMessage({ filledHtml }, window.origin);
-              };
-              setTimeout(() => {
-                console.log("Retrying postMessage to preview window...");
-              previewWindow.postMessage({ filledHtml }, "*");  //  Ensure message is sent
-                //  previewWindow.postMessage({ filledHtml }, window.origin);
-              }, 1000); // Fallback in case onload doesn't trigger
-          } else {
-              console.error("Popup blocked! Cannot open preview.");
-              setMessage("Please allow pop-ups to see the filled form.");
-          }
-      }
-    
-
-   
+    // If preview window is not open, open it
+    if (!previewWindow || previewWindow.closed) {
+      previewWindow = window.open("/preview", "_blank");
+  } else {
+      // If open, send message to reload
+      previewWindow.postMessage({ type: "RELOAD_FORM" }, window.origin);
+      // Send message after a slight delay to ensure the window is ready
+    setTimeout(() => {
+      previewWindow.postMessage({ filledHtml }, window.origin);
+  }, 500);
+  }
+      
     } catch (error) {
       console.error("Upload failed:", error);
       setMessage("Upload failed! Please try again.");
@@ -310,7 +246,7 @@ const navigate = useNavigate();
       <p>Upload Form:</p>
       <input type="file" onChange={handleFormFileChange} />
 
-      <p>Select Your Preferred Model:</p>
+      {/*<p>Select Your Preferred Model:</p>
       <select onChange={(e) => setSelectedModel(e.target.value)} value={selectedModel}>
         {models.map((model, index) => (
           <option key={index} value={model}>
@@ -323,7 +259,7 @@ const navigate = useNavigate();
       <select onChange={(e) => setSelectedLLMSource(e.target.value)} value={selectedLLMSource}>
       <option value="ollama">Local : Ollama</option>
       <option value="huggingFace">Hugging Face</option>
-      </select>
+      </select>*/}
 
       <button 
         onClick={handlePreview}
